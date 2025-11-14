@@ -126,126 +126,71 @@ module.exports = {
             const winRate = playerStats.games_played > 0 ? ((playerStats.wins / playerStats.games_played) * 100).toFixed(1) : 0;
 
             // Crear barra de progreso para winrate
-            const winRateBar = createProgressBar(parseFloat(winRate), 100, 10);
+            const winRateBar = createProgressBar(parseFloat(winRate), 100, 12);
 
-            // Construir el embed con mejor diseño inspirado en mctiers.com
+            // Obtener rango/prefix si existe
+            const rankPrefix = playerStats.rank_prefix || playerStats.victory_rank || '';
+            const displayName = rankPrefix ? `${rankPrefix} ${playerName}` : playerName;
+
+            // Construir el embed con diseño premium
             const tierEmoji = getTierEmoji(playerStats.tier_test_rank);
             const embed = new EmbedBuilder()
                 .setColor(getTierColor(playerStats.tier_test_rank))
                 .setAuthor({
-                    name: `${playerName}`,
+                    name: displayName,
                     iconURL: `https://crafatar.com/avatars/${uuid}?overlay&size=64`
                 })
-                .setTitle(`📊 Estadísticas de The Bridge`)
-                .setThumbnail(`https://visage.surgeplay.com/full/512/${uuid}`) // Render 3D completo
-                .setDescription(`━━━━━━━━━━━━━━━━━━━━━━`)
+                .setTitle(`${tierEmoji} ESTADÍSTICAS DE THE BRIDGE`)
+                .setThumbnail(`https://visage.surgeplay.com/full/512/${uuid}`)
+                .setDescription(
+                    `> **${playerStats.tier_test_rank || 'Sin Tier'}** • ELO: **${playerStats.elo || 1000}**\n` +
+                    `> Rango: **${playerStats.victory_rank || 'Novato'}**\n` +
+                    `\`\`\`ansi\n[2;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m\n\`\`\``
+                )
                 .addFields(
-                    // SECCIÓN DE RANGOS
+                    // RENDIMIENTO GENERAL
                     {
-                        name: '\u200B',
-                        value: `### 🏅 **RANGOS Y CLASIFICACIÓN**`,
+                        name: '🏆 RENDIMIENTO GENERAL',
+                        value:
+                            `**Victorias:** \`${formatNumber(playerStats.wins || 0)}\` • ` +
+                            `**Derrotas:** \`${formatNumber(playerStats.losses || 0)}\`\n` +
+                            `**Partidas:** \`${formatNumber(playerStats.games_played || 0)}\` • ` +
+                            `**W/L:** \`${wlRatio}\`\n` +
+                            `**Win Rate:** ${winRateBar} \`${winRate}%\``,
                         inline: false
                     },
+
+                    // RACHAS
                     {
-                        name: '🏆 Rango de Victorias',
-                        value: `\`\`\`${playerStats.victory_rank || 'Sin Rango'}\`\`\``,
-                        inline: true
-                    },
-                    {
-                        name: `${tierEmoji} Tier Test`,
-                        value: `\`\`\`${playerStats.tier_test_rank || 'Sin Tier'}\`\`\``,
-                        inline: true
-                    },
-                    {
-                        name: '🧠 ELO Rating',
-                        value: `\`\`\`${playerStats.elo || '1000'}\`\`\``,
+                        name: '🔥 RACHAS',
+                        value:
+                            `**Racha Actual:** \`${playerStats.win_streak || 0}\` victorias\n` +
+                            `**Mejor Racha:** \`${playerStats.best_win_streak || 0}\` victorias`,
                         inline: true
                     },
 
-                    // SEPARADOR
-                    { name: '\u200B', value: `━━━━━━━━━━━━━━━━━━━━━━`, inline: false },
-
-                    // SECCIÓN DE VICTORIAS/DERROTAS
+                    // COMBATE
                     {
-                        name: '\u200B',
-                        value: `### 📊 **RENDIMIENTO GENERAL**`,
-                        inline: false
-                    },
-                    {
-                        name: '🎮 Partidas Jugadas',
-                        value: `**${formatNumber(playerStats.games_played || 0)}**`,
-                        inline: true
-                    },
-                    {
-                        name: '✅ Victorias',
-                        value: `**${formatNumber(playerStats.wins || 0)}**`,
-                        inline: true
-                    },
-                    {
-                        name: '❌ Derrotas',
-                        value: `**${formatNumber(playerStats.losses || 0)}**`,
-                        inline: true
-                    },
-                    {
-                        name: '📈 Win Rate',
-                        value: `${winRateBar} **${winRate}%**`,
-                        inline: false
-                    },
-                    {
-                        name: '📊 W/L Ratio',
-                        value: `**${wlRatio}**`,
-                        inline: true
-                    },
-                    {
-                        name: '🔥 Racha Actual',
-                        value: `**${playerStats.win_streak || 0}** wins`,
-                        inline: true
-                    },
-                    {
-                        name: '⭐ Mejor Racha',
-                        value: `**${playerStats.best_win_streak || 0}** wins`,
+                        name: '⚔️ COMBATE',
+                        value:
+                            `**Asesinatos:** \`${formatNumber(playerStats.kills || 0)}\`\n` +
+                            `**Muertes:** \`${formatNumber(playerStats.deaths || 0)}\`\n` +
+                            `**K/D Ratio:** \`${kdRatio}\``,
                         inline: true
                     },
 
-                    // SEPARADOR
-                    { name: '\u200B', value: `━━━━━━━━━━━━━━━━━━━━━━`, inline: false },
-
-                    // SECCIÓN DE COMBATE
+                    // OBJETIVOS
                     {
-                        name: '\u200B',
-                        value: `### ⚔️ **ESTADÍSTICAS DE COMBATE**`,
-                        inline: false
-                    },
-                    {
-                        name: '🎯 Asesinatos',
-                        value: `**${formatNumber(playerStats.kills || 0)}**`,
+                        name: '⚽ OBJETIVOS',
+                        value:
+                            `**Goles:** \`${formatNumber(playerStats.goals || 0)}\`\n` +
+                            `**Puntos:** \`${formatNumber(playerStats.points || 0)}\``,
                         inline: true
-                    },
-                    {
-                        name: '💀 Muertes',
-                        value: `**${formatNumber(playerStats.deaths || 0)}**`,
-                        inline: true
-                    },
-                    {
-                        name: '📈 K/D Ratio',
-                        value: `**${kdRatio}**`,
-                        inline: true
-                    },
-                    {
-                        name: '⚽ Goles Anotados',
-                        value: `**${formatNumber(playerStats.goals || 0)}**`,
-                        inline: true
-                    },
-                    {
-                        name: '🛡️ Nexus Destruidos',
-                        value: `**${formatNumber(playerStats.wins || 0)}**`,
-                        inline: true
-                    },
-                    { name: '\u200B', value: '\u200B', inline: true }
+                    }
                 )
                 .setFooter({
-                    text: `UUID: ${uuid} • Última actualización`,
-                    iconURL: 'https://cdn.discordapp.com/emojis/1234567890.png'
+                    text: `ID: ${uuid.split('-')[0]}... • Actualizado`,
+                    iconURL: `https://crafatar.com/avatars/${uuid}?overlay&size=16`
                 })
                 .setTimestamp();
 
