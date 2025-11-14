@@ -26,9 +26,9 @@ for (const file of commandFiles) {
 }
 
 
-// Role Sync System
-const RoleSync = require('./utils/roleSync.js');
-const roleSync = new RoleSync(client);
+// Notification Handler System
+const NotificationHandler = require('./utils/notificationHandler.js');
+const notificationHandler = new NotificationHandler(client);
 
 // 1. AÑADE ESTO: Un "listener" para el evento 'ready'
 // Esto se ejecutará DESPUÉS de que el login sea exitoso.
@@ -36,8 +36,8 @@ client.on(Events.ClientReady, () => {
     console.log(`¡ÉXITO! Bot conectado como ${client.user.tag}`);
     console.log(`¡El bot ya está en línea y listo en tu servidor!`);
 
-    // Start role sync system
-    roleSync.start();
+    // Start notification handler system
+    notificationHandler.start();
 });
 
 client.on(Events.InteractionCreate, async interaction => {
