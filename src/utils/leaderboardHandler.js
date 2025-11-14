@@ -33,7 +33,13 @@ class LeaderboardHandler {
                 WHERE ttr.posted_to_leaderboard = 0
                 ORDER BY ttr.completed_at DESC
                 LIMIT 10
-            `);
+            `).catch(err => {
+                // Si la tabla no existe, simplemente retornar array vacío
+                if (err.code === 'ER_NO_SUCH_TABLE') {
+                    return [[]];
+                }
+                throw err;
+            });
 
             if (results.length === 0) {
                 return;
