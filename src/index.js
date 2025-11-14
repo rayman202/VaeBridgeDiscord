@@ -30,6 +30,10 @@ for (const file of commandFiles) {
 const NotificationHandler = require('./utils/notificationHandler.js');
 const notificationHandler = new NotificationHandler(client);
 
+// Leaderboard Handler System
+const LeaderboardHandler = require('./utils/leaderboardHandler.js');
+const leaderboardHandler = new LeaderboardHandler(client);
+
 // 1. AÑADE ESTO: Un "listener" para el evento 'ready'
 // Esto se ejecutará DESPUÉS de que el login sea exitoso.
 client.on(Events.ClientReady, () => {
@@ -38,6 +42,9 @@ client.on(Events.ClientReady, () => {
 
     // Start notification handler system
     notificationHandler.start();
+
+    // Start leaderboard handler system
+    leaderboardHandler.start();
 });
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -156,6 +163,121 @@ client.on(Events.InteractionCreate, async interaction => {
         } else if (interaction.customId === 'close-ticket') {
             const channel = interaction.channel;
             await channel.send('⏳ Cerrando ticket en 5 segundos...');
+            setTimeout(async () => {
+                await channel.delete();
+            }, 5000);
+
+        } else if (interaction.customId === 'create-support-ticket') {
+            const member = interaction.member;
+            const guild = interaction.guild;
+
+            try {
+                // Buscar roles de staff
+                const adminRole = guild.roles.cache.find(r => r.name.toLowerCase().includes('admin') || r.name.toLowerCase().includes('dueño'));
+                const modRole = guild.roles.cache.find(r => r.name.toLowerCase().includes('mod'));
+
+                // Crear canal privado para el ticket
+                const ticketChannel = await guild.channels.create({
+                    name: `ticket-${member.user.username}`,
+                    type: ChannelType.GuildText,
+                    permissionOverwrites: [
+                        {
+                            id: guild.id,
+                            deny: [PermissionsBitField.Flags.ViewChannel],
+                        },
+                        {
+                            id: member.id,
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory
+                            ],
+                        },
+                        // Permitir a administradores
+                        ...(adminRole ? [{
+                            id: adminRole.id,
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory
+                            ],
+                        }] : []),
+                        // Permitir a moderadores
+                        ...(modRole ? [{
+                            id: modRole.id,
+                            allow: [
+                                PermissionsBitField.Flags.ViewChannel,
+                                PermissionsBitField.Flags.SendMessages,
+                                PermissionsBitField.Flags.ReadMessageHistory
+                            ],
+                        }] : []),
+                    ],
+                });
+
+                // Crear embed de bienvenida
+                const welcomeEmbed = new EmbedBuilder()
+                    .setColor(0x00D9FF)
+                    .setTitle('🎫 Ticket de Soporte Creado')
+                    .setDescription(
+                        `¡Hola ${member}! Bienvenido a tu ticket de soporte.\n\n` +
+                        `Un miembro del staff ${adminRole || modRole ? `(${adminRole || ''} ${modRole || ''})` : ''} te atenderá pronto.\n\n` +
+                        `**Por favor describe tu problema o pregunta con el mayor detalle posible.**\n\n` +
+                        `Cuando tu problema esté resuelto, puedes cerrar este ticket haciendo clic en el botón de abajo.`
+                    )
+                    .addFields(
+                        { name: '👤 Usuario', value: member.user.tag, inline: true },
+                        { name: '📅 Creado', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: true }
+                    )
+                    .setFooter({ text: 'Gracias por contactarnos' })
+                    .setTimestamp();
+
+                const closeButton = new ButtonBuilder()
+                    .setCustomId('close-support-ticket')
+                    .setLabel('🔒 Cerrar Ticket')
+                    .setStyle(ButtonStyle.Danger);
+
+                const row = new ActionRowBuilder().addComponents(closeButton);
+
+                // Mencionar al usuario y roles de staff
+                let mentions = `${member}`;
+                if (adminRole) mentions += ` ${adminRole}`;
+                if (modRole) mentions += ` ${modRole}`;
+
+                await ticketChannel.send({
+                    content: mentions,
+                    embeds: [welcomeEmbed],
+                    components: [row]
+                });
+
+                // Responder al usuario
+                await interaction.reply({
+                    content: `✅ Tu ticket ha sido creado: ${ticketChannel}`,
+                    flags: 64
+                });
+
+            } catch (error) {
+                console.error('Error creating support ticket:', error);
+                await interaction.reply({
+                    content: '❌ Ocurrió un error al crear tu ticket. Inténtalo de nuevo.',
+                    flags: 64
+                });
+            }
+
+        } else if (interaction.customId === 'close-support-ticket') {
+            const channel = interaction.channel;
+
+            // Verificar permisos
+            const hasPermission = interaction.member.permissions.has(PermissionsBitField.Flags.ManageChannels) ||
+                channel.name.includes(interaction.user.username);
+
+            if (!hasPermission) {
+                return interaction.reply({
+                    content: '❌ Solo el staff o el creador del ticket pueden cerrarlo.',
+                    flags: 64
+                });
+            }
+
+            await interaction.reply('⏳ Cerrando ticket en 5 segundos...');
             setTimeout(async () => {
                 await channel.delete();
             }, 5000);
