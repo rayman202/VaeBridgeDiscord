@@ -60,7 +60,7 @@ module.exports = {
 
             // Get previous tier from database
             const [playerData] = await pool.query(
-                'SELECT tier_test_rank FROM players WHERE uuid = ?',
+                'SELECT tier_test_rank FROM player_stats WHERE uuid = ?',
                 [uuid]
             );
 
@@ -70,16 +70,15 @@ module.exports = {
 
             // Update player tier in database
             await pool.query(
-                'UPDATE players SET tier_test_rank = ? WHERE uuid = ?',
+                'UPDATE player_stats SET tier_test_rank = ? WHERE uuid = ?',
                 [tier, uuid]
             );
 
-            // Record in tier test history
+            // Record tier test result for leaderboard
             await pool.query(
-                `INSERT INTO tier_test_history
-                (minecraft_uuid, previous_rank, new_rank, tester_discord_id, tester_discord_name, note)
-                VALUES (?, ?, ?, ?, ?, ?)`,
-                [uuid, previousTier, tier, interaction.user.id, interaction.user.username, nota]
+                `INSERT INTO tier_test_results (minecraft_uuid, tier_rank, tier_division, completed_at)
+                VALUES (?, ?, ?, NOW())`,
+                [uuid, tier, getTierDivision(tier)]
             );
 
             // Generate result image
@@ -254,4 +253,11 @@ function getTierColor(tier) {
     if (tier.startsWith('HT5')) return '#00bfff'; // Deep Sky Blue
     if (tier.startsWith('LT5')) return '#808080'; // Gray - Lowest
     return '#ffffff'; // White - Default
+}
+
+function getTierDivision(tier) {
+    if (tier.startsWith('HT') || tier.startsWith('LT')) {
+        return tier.startsWith('HT') ? 'High Tier' : 'Low Tier';
+    }
+    return 'Unranked';
 }
