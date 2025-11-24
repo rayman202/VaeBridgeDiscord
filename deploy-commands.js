@@ -30,10 +30,12 @@ const rest = new REST({ version: '9' }).setToken(process.env.DISCORD_TOKEN);
         console.log('Successfully reloaded application (/) commands.');
 
         console.log('Creating tables...');
+        // Create bot_settings table
         await pool.query(`
-            CREATE TABLE IF NOT EXISTS discord_links (
-                discord_id VARCHAR(255) PRIMARY KEY,
-                uuid VARCHAR(36) NOT NULL
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                guild_id VARCHAR(64) PRIMARY KEY,
+                general_channel_id VARCHAR(64),
+                highscores_channel_id VARCHAR(64)
             );
         `);
         console.log('Tables created successfully.');
