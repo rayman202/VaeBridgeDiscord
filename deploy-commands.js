@@ -38,6 +38,28 @@ const rest = new REST({ version: '9' }).setToken(process.env.DISCORD_TOKEN);
                 highscores_channel_id VARCHAR(64)
             );
         `);
+
+        // Create tier_test_results table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS tier_test_results (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                minecraft_uuid VARCHAR(36) NOT NULL,
+                tier_rank VARCHAR(64),
+                completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                posted_to_leaderboard TINYINT(1) DEFAULT 0,
+                INDEX idx_posted (posted_to_leaderboard)
+            );
+        `);
+
+        // Create leaderboard_config table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS leaderboard_config (
+                guild_id VARCHAR(64) PRIMARY KEY,
+                normal_channel_id VARCHAR(64),
+                high_channel_id VARCHAR(64)
+            );
+        `);
+        
         console.log('Tables created successfully.');
 
     } catch (error) {

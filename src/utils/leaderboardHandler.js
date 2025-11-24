@@ -29,7 +29,7 @@ class LeaderboardHandler {
             const [results] = await connection.query(`
                 SELECT ttr.*, ps.name as player_name, ps.uuid
                 FROM tier_test_results ttr
-                JOIN player_stats ps ON ttr.minecraft_uuid = ps.uuid
+                JOIN players ps ON ttr.minecraft_uuid = ps.uuid
                 WHERE ttr.posted_to_leaderboard = 0
                 ORDER BY ttr.completed_at DESC
                 LIMIT 10
@@ -142,7 +142,7 @@ class LeaderboardHandler {
 
         // Obtener datos del jugador
         const [playerData] = await pool.query(
-            'SELECT * FROM player_stats WHERE uuid = ?',
+            'SELECT * FROM players WHERE uuid = ?',
             [result.uuid]
         );
 
