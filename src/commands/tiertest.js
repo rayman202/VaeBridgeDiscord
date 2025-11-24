@@ -103,18 +103,34 @@ module.exports = {
             ctx.fillText('BRIDGE TEST RESULTS', 80, 80);
 
             // Player skin
-            const skinUrl = `https://crafatar.com/renders/body/${uuid}?overlay`;
+            // Usamos Visage que suele ser más estable para renders completos
+            const skinUrl = `https://visage.surgeplay.com/full/512/${uuid}`;
+            
             try {
+                // Intentamos cargar la skin con un timeout
                 const skin = await loadImage(skinUrl);
                 ctx.drawImage(skin, 70, 130, 200, 350);
             } catch (error) {
-                console.error('Failed to load player skin:', error);
-                ctx.fillStyle = '#333';
-                ctx.fillRect(70, 130, 200, 350);
-                ctx.fillStyle = '#fff';
-                ctx.font = '20px Arial';
-                ctx.fillText('Skin', 130, 300);
-                ctx.fillText('Error', 120, 330);
+                console.error('Failed to load player skin from Visage:', error.message);
+                
+                // Fallback: Intentar con Crafatar si Visage falla
+                try {
+                    const fallbackUrl = `https://crafatar.com/renders/body/${uuid}?overlay`;
+                    const skinFallback = await loadImage(fallbackUrl);
+                    ctx.drawImage(skinFallback, 70, 130, 200, 350);
+                } catch (fallbackError) {
+                    console.error('Failed to load player skin from Crafatar (fallback):', fallbackError.message);
+                    
+                    // Si todo falla, dibujar un placeholder
+                    ctx.fillStyle = '#333';
+                    ctx.fillRect(70, 130, 200, 350);
+                    ctx.fillStyle = '#fff';
+                    ctx.font = '20px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Skin no', 170, 300);
+                    ctx.fillText('disponible', 170, 330);
+                    ctx.textAlign = 'start'; // Reset alignment
+                }
             }
 
             // Player info
