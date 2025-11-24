@@ -32,12 +32,11 @@ module.exports = {
 
             // Guardar la configuración en la base de datos
             await pool.query(`
-                INSERT INTO leaderboard_config (guild_id, normal_channel_id, high_channel_id, updated_at)
-                VALUES (?, ?, ?, NOW())
+                INSERT INTO leaderboard_config (guild_id, normal_channel_id, high_channel_id)
+                VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE
                     normal_channel_id = VALUES(normal_channel_id),
-                    high_channel_id = VALUES(high_channel_id),
-                    updated_at = NOW()
+                    high_channel_id = VALUES(high_channel_id)
             `, [interaction.guild.id, normalChannel.id, highChannel.id]);
 
             // Enviar mensaje inicial a ambos canales
