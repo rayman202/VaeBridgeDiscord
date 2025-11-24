@@ -66,7 +66,7 @@ module.exports = {
 
             const previousTier = (playerData.length > 0 && playerData[0].tier_test_rank)
                 ? playerData[0].tier_test_rank
-                : 'N/A';
+                : 'Unranked';
 
             // Update player tier in database
             await pool.query(
@@ -81,137 +81,24 @@ module.exports = {
                 [uuid, tier]
             );
 
-            // Generate result image
-            const canvas = createCanvas(1000, 600);
-            const ctx = canvas.getContext('2d');
-
-            // Background gradient
-            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            gradient.addColorStop(0, '#1a1a2e');
-            gradient.addColorStop(1, '#16213e');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Decorative elements
-            ctx.strokeStyle = '#0f3460';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(20, 20, canvas.width - 40, canvas.height - 40);
-
-            // Title
-            ctx.fillStyle = '#e94560';
-            ctx.font = 'bold 48px Arial';
-            ctx.fillText('BRIDGE TEST RESULTS', 80, 80);
-
-            // Player skin
-            // Usamos Visage como fuente principal
+            // Generate Embed instead of Canvas Image
+            const tierColor = getTierColor(tier);
             const skinUrl = `https://visage.surgeplay.com/full/512/${uuid}`;
-            
-            try {
-                // Helper para descargar imagen con User-Agent
-                const downloadImage = async (url) => {
-                    const response = await fetch(url, {
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
-                    });
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    const arrayBuffer = await response.arrayBuffer();
-                    return Buffer.from(arrayBuffer);
-                };
 
-                // Descargar primero el buffer
-                const imageBuffer = await downloadImage(skinUrl);
-                const skin = await loadImage(imageBuffer);
-                ctx.drawImage(skin, 70, 130, 200, 350);
-
-            } catch (error) {
-                console.error(`Failed to load skin from Visage (${skinUrl}):`, error.message);
-                
-                // Fallback: Crafatar
-                try {
-                    const fallbackUrl = `https://crafatar.com/renders/body/${uuid}?overlay`;
-                    const response = await fetch(fallbackUrl); // Crafatar suele ser más permisivo
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    const arrayBuffer = await response.arrayBuffer();
-                    const skinFallback = await loadImage(Buffer.from(arrayBuffer));
-                    ctx.drawImage(skinFallback, 70, 130, 200, 350);
-                } catch (fallbackError) {
-                    console.error('Failed to load skin from fallback:', fallbackError.message);
-                    
-                    // Placeholder final si todo falla
-                    ctx.fillStyle = '#222';
-                    ctx.fillRect(70, 130, 200, 350);
-                    ctx.fillStyle = '#eee';
-                    ctx.font = '20px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('Skin no', 170, 280);
-                    ctx.fillText('disponible', 170, 310);
-                    ctx.textAlign = 'left'; // Reset alignment
-                }
-            }
-
-            // Player info
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 36px Arial';
-            ctx.fillText('Minecraft Username:', 320, 180);
-            ctx.font = '32px Arial';
-            ctx.fillStyle = '#00d9ff';
-            ctx.fillText(ign, 320, 220);
-
-            // Tier Update
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 36px Arial';
-            ctx.fillText('Tier Update:', 320, 280);
-
-            // Previous -> New Tier
-            ctx.font = 'bold 32px Arial';
-            if (previousTier === 'N/A') {
-                ctx.fillStyle = '#888';
-                ctx.fillText('Unranked', 320, 320);
-            } else {
-                ctx.fillStyle = getTierColor(previousTier);
-                ctx.fillText(previousTier, 320, 320);
-            }
-
-            ctx.fillStyle = '#ffffff';
-            ctx.fillText('→', 450, 320);
-
-            ctx.fillStyle = getTierColor(tier);
-            ctx.fillText(tier, 520, 320);
-
-            // Tested by
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 28px Arial';
-            ctx.fillText('Tested by:', 320, 380);
-            ctx.font = '26px Arial';
-            ctx.fillStyle = '#00d9ff';
-            ctx.fillText(interaction.user.tag, 320, 415);
-
-            // Tester note
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px Arial';
-            ctx.fillText('Tester Note:', 320, 465);
-            ctx.font = '20px Arial';
-            ctx.fillStyle = '#ddd';
-
-            // Word wrap for note
-            const maxWidth = 600;
-            const words = nota.split(' ');
-            let line = '';
-            let y = 495;
-            for (let n = 0; n < words.length; n++) {
-                const testLine = line + words[n] + ' ';
-                const metrics = ctx.measureText(testLine);
-                if (metrics.width > maxWidth && n > 0) {
-                    ctx.fillText(line, 320, y);
-                    line = words[n] + ' ';
-                    y += 25;
-                } else {
-                    line = testLine;
-                }
-            }
-            ctx.fillText(line, 320, y);
-
-            const buffer = canvas.toBuffer('image/png');
-            const attachment = new AttachmentBuilder(buffer, { name: 'tiertest-result.png' });
+            const embed = new EmbedBuilder()
+                .setColor(tierColor)
+                .setTitle('🏆 BRIDGE TIER TEST RESULTS')
+                .setDescription(`Resultados del test para **${ign}**`)
+                .setThumbnail(`https://crafatar.com/avatars/${uuid}?overlay`)
+                .setImage(skinUrl) // Show full body render directly in embed
+                .addFields(
+                    { name: '👤 Jugador', value: `${discordUser} (\`${ign}\`)`, inline: true },
+                    { name: '👮 Tester', value: `${interaction.user}`, inline: true },
+                    { name: '📈 Progreso de Tier', value: `\`${previousTier}\` ➔ \`${tier}\``, inline: false },
+                    { name: '📝 Notas del Tester', value: `\`\`\`${nota}\`\`\``, inline: false }
+                )
+                .setFooter({ text: 'VaeBridge Tier System', iconURL: interaction.guild.iconURL() })
+                .setTimestamp();
 
             // Send to results channel
             const resultsChannel = interaction.guild.channels.cache.find(
@@ -220,8 +107,8 @@ module.exports = {
 
             if (resultsChannel) {
                 await resultsChannel.send({
-                    content: `🏆 **Nuevo Tier Test Completado** 🏆\n${discordUser} ha sido evaluado!`,
-                    files: [attachment]
+                    content: `🏆 **Nuevo Tier Test Completado**`,
+                    embeds: [embed]
                 });
             }
 
@@ -248,7 +135,7 @@ module.exports = {
                 ephemeral: true
             });
 
-            // Close ticket after 1 minute
+            // Close ticket logic
             if (interaction.channel.name.startsWith('test-')) {
                 setTimeout(async () => {
                     try {
