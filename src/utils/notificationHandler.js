@@ -9,11 +9,62 @@ class NotificationHandler {
 
     start() {
         console.log('✅ NotificationHandler started');
+        
+        // Process pending notifications frequently (every 10s)
         this.interval = setInterval(() => this.checkNotifications(), this.checkInterval);
+        
+        // Check nickname consistency occasionally (every 5 minutes)
+        // This ensures nicknames are updated even if the event was missed
+        setInterval(() => this.checkNicknameConsistency(), 5 * 60 * 1000);
+        
+        // Run immediately on startup
+        this.checkNicknameConsistency();
     }
 
     stop() {
         clearInterval(this.interval);
+    }
+
+    async checkNicknameConsistency() {
+        try {
+            console.log('[NICKNAME] Starting consistency check...');
+            // Get all linked users
+            const [links] = await pool.query('SELECT discord_id, minecraft_username FROM discord_links');
+            
+            for (const link of links) {
+                await this.updateUserNickname(link.discord_id, link.minecraft_username);
+            }
+            console.log('[NICKNAME] Consistency check completed.');
+        } catch (error) {
+            console.error('[NICKNAME] Error during consistency check:', error);
+        }
+    }
+
+    async updateUserNickname(discordId, nickname) {
+        for (const [guildId, guild] of this.client.guilds.cache) {
+            try {
+                const member = await guild.members.fetch(discordId).catch(() => null);
+                if (!member) continue;
+
+                // Skip if nickname is already correct
+                if (member.nickname === nickname) continue;
+
+                const botMember = guild.members.me;
+                
+                // Check permissions
+                if (!botMember.permissions.has('ManageNicknames')) continue;
+                if (member.id === guild.ownerId) continue;
+                if (!member.manageable) continue;
+
+                await member.setNickname(nickname);
+                console.log(`[NICKNAME] Updated nickname for ${member.user.tag} to "${nickname}" in ${guild.name}`);
+            } catch (err) {
+                // Silent fail for common permission errors to avoid log spam during bulk checks
+                if (err.code !== 50013) { // 50013 = Missing Permissions
+                    console.error(`[NICKNAME] Error updating ${discordId} in ${guild.name}:`, err.message);
+                }
+            }
+        }
     }
 
     async checkNotifications() {
@@ -77,36 +128,7 @@ class NotificationHandler {
         try {
             const nickname = data.minecraft_username;
             console.log(`[LINK] Processing nickname change for ${discordId} -> ${nickname}`);
-            
-            for (const [guildId, guild] of this.client.guilds.cache) {
-                try {
-                    const member = await guild.members.fetch(discordId).catch(() => null);
-                    if (member) {
-                        const botMember = guild.members.me;
-                        
-                        // Check if bot has permission AND if the user is manageable (bot role > user role)
-                        if (!botMember.permissions.has('ManageNicknames')) {
-                            console.warn(`[LINK] ⚠️ Missing 'Manage Nicknames' permission in guild: ${guild.name}`);
-                            continue;
-                        }
-
-                        if (member.id === guild.ownerId) {
-                            console.warn(`[LINK] ⚠️ Cannot change nickname of server owner in ${guild.name}`);
-                            continue;
-                        }
-
-                        if (!member.manageable) {
-                            console.warn(`[LINK] ⚠️ Cannot change nickname of ${member.user.tag} in ${guild.name} (User role is higher than Bot role)`);
-                            continue;
-                        }
-
-                        await member.setNickname(nickname);
-                        console.log(`[LINK] ✅ Changed nickname for ${member.user.tag} to "${nickname}" in ${guild.name}`);
-                    }
-                } catch (err) {
-                    console.error(`[LINK] ❌ Error changing nickname in guild ${guild.name}:`, err);
-                }
-            }
+            await this.updateUserNickname(discordId, nickname);
         } catch (error) {
             console.error('Error handling link success:', error);
         }
