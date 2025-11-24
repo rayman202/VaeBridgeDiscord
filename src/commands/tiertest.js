@@ -73,11 +73,21 @@ module.exports = {
                 [tier, uuid]
             );
 
+            // Check if tester_note column exists, if not add it
+            try {
+                await pool.query('SELECT tester_note FROM tier_test_results LIMIT 1');
+            } catch (err) {
+                if (err.code === 'ER_BAD_FIELD_ERROR') {
+                    console.log('Adding missing tester_note column to tier_test_results...');
+                    await pool.query('ALTER TABLE tier_test_results ADD COLUMN tester_note TEXT');
+                }
+            }
+
             // Record tier test result for leaderboard
             await pool.query(
-                `INSERT INTO tier_test_results (minecraft_uuid, tier_rank, completed_at)
-                VALUES (?, ?, NOW())`,
-                [uuid, tier]
+                `INSERT INTO tier_test_results (minecraft_uuid, tier_rank, tester_note, completed_at)
+                VALUES (?, ?, ?, NOW())`,
+                [uuid, tier, nota]
             );
 
             // Generate Embed instead of Canvas Image

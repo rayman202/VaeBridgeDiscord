@@ -45,6 +45,7 @@ const rest = new REST({ version: '9' }).setToken(process.env.DISCORD_TOKEN);
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 minecraft_uuid VARCHAR(36) NOT NULL,
                 tier_rank VARCHAR(64),
+                tester_note TEXT,
                 completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 posted_to_leaderboard TINYINT(1) DEFAULT 0,
                 INDEX idx_posted (posted_to_leaderboard)

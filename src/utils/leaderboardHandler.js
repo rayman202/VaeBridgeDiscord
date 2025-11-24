@@ -145,18 +145,26 @@ class LeaderboardHandler {
             'SELECT * FROM players WHERE uuid = ?',
             [result.uuid]
         );
-
         const player = playerData[0] || {};
+
+        // Obtener Discord ID para mencionar
+        let discordMention = result.player_name;
+        try {
+            const [link] = await pool.query('SELECT discord_id FROM discord_links WHERE minecraft_uuid = ?', [result.uuid]);
+            if (link.length > 0) {
+                discordMention = `<@${link[0].discord_id}>`;
+            }
+        } catch (e) {}
 
         const embed = new EmbedBuilder()
             .setColor(tierColor)
             .setAuthor({
-                name: result.player_name,
-                iconURL: `https://crafatar.com/avatars/${result.uuid}?overlay&size=64`
+                name: `${result.player_name}`,
+                iconURL: `https://visage.surgeplay.com/face/64/${result.uuid}`
             })
             .setTitle(`${tierEmoji} TIER TEST COMPLETADO`)
-            .setThumbnail(`https://crafatar.com/renders/head/${result.uuid}?overlay&scale=10`)
-            .setDescription(`━━━━━━━━━━━━━━━━━━━━━━`)
+            .setThumbnail(`https://visage.surgeplay.com/bust/128/${result.uuid}`)
+            .setDescription(`¡${discordMention} ha completado su Tier Test!`)
             .addFields(
                 {
                     name: '🎯 Tier Alcanzado',
@@ -172,6 +180,16 @@ class LeaderboardHandler {
                     name: '📅 Fecha',
                     value: `<t:${Math.floor(new Date(result.completed_at).getTime() / 1000)}:R>`,
                     inline: true
+                },
+                {
+                    name: '\u200B',
+                    value: '━━━━━━━━━━━━━━━━━━━━━━',
+                    inline: false
+                },
+                {
+                    name: '📝 Comentario del Tester',
+                    value: `>>> *${result.tester_note || 'Sin comentarios.'}*`,
+                    inline: false
                 },
                 {
                     name: '\u200B',
@@ -196,7 +214,7 @@ class LeaderboardHandler {
             )
             .setFooter({
                 text: isHighChannel ? '🏆 Resultado Alto • Tier Test' : '📊 Tier Test',
-                iconURL: 'https://crafatar.com/avatars/' + result.uuid + '?overlay&size=32'
+                iconURL: 'https://visage.surgeplay.com/head/64/' + result.uuid
             })
             .setTimestamp(new Date(result.completed_at));
 
