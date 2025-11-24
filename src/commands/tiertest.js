@@ -103,33 +103,48 @@ module.exports = {
             ctx.fillText('BRIDGE TEST RESULTS', 80, 80);
 
             // Player skin
-            // Usamos Visage que suele ser más estable para renders completos
+            // Usamos Visage como fuente principal
             const skinUrl = `https://visage.surgeplay.com/full/512/${uuid}`;
             
             try {
-                // Intentamos cargar la skin con un timeout
-                const skin = await loadImage(skinUrl);
+                // Helper para descargar imagen con User-Agent
+                const downloadImage = async (url) => {
+                    const response = await fetch(url, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const arrayBuffer = await response.arrayBuffer();
+                    return Buffer.from(arrayBuffer);
+                };
+
+                // Descargar primero el buffer
+                const imageBuffer = await downloadImage(skinUrl);
+                const skin = await loadImage(imageBuffer);
                 ctx.drawImage(skin, 70, 130, 200, 350);
+
             } catch (error) {
-                console.error('Failed to load player skin from Visage:', error.message);
+                console.error(`Failed to load skin from Visage (${skinUrl}):`, error.message);
                 
-                // Fallback: Intentar con Crafatar si Visage falla
+                // Fallback: Crafatar
                 try {
                     const fallbackUrl = `https://crafatar.com/renders/body/${uuid}?overlay`;
-                    const skinFallback = await loadImage(fallbackUrl);
+                    const response = await fetch(fallbackUrl); // Crafatar suele ser más permisivo
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const skinFallback = await loadImage(Buffer.from(arrayBuffer));
                     ctx.drawImage(skinFallback, 70, 130, 200, 350);
                 } catch (fallbackError) {
-                    console.error('Failed to load player skin from Crafatar (fallback):', fallbackError.message);
+                    console.error('Failed to load skin from fallback:', fallbackError.message);
                     
-                    // Si todo falla, dibujar un placeholder
-                    ctx.fillStyle = '#333';
+                    // Placeholder final si todo falla
+                    ctx.fillStyle = '#222';
                     ctx.fillRect(70, 130, 200, 350);
-                    ctx.fillStyle = '#fff';
+                    ctx.fillStyle = '#eee';
                     ctx.font = '20px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText('Skin no', 170, 300);
-                    ctx.fillText('disponible', 170, 330);
-                    ctx.textAlign = 'start'; // Reset alignment
+                    ctx.fillText('Skin no', 170, 280);
+                    ctx.fillText('disponible', 170, 310);
+                    ctx.textAlign = 'left'; // Reset alignment
                 }
             }
 
