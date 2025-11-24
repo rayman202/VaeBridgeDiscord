@@ -1,15 +1,74 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const pool = require('../utils/db.js');
 
-// Helper function to get a color based on ELO
-function getEloColor(elo) {
-    if (elo >= 2000) return 0xff0080; // Rosa neón (Master)
-    if (elo >= 1800) return 0xffd700; // Dorado (Diamond)
-    if (elo >= 1600) return 0x00ffff; // Cyan (Platinum)
-    if (elo >= 1400) return 0x9d4edd; // Púrpura (Gold)
-    if (elo >= 1200) return 0x00d9ff; // Azul claro (Silver)
-    return 0x90cdf4; // Azul pálido (Bronze/Novato)
+// Helper function to get a color based on tier test rank
+function getTierColor(tierRank) {
+    if (!tierRank || tierRank === 'N/A' || tierRank === 'Sin Rango' || tierRank === 'Sin Tier') return 0x7289DA; // Discord Blurple por defecto
+
+    const tier = tierRank.toUpperCase();
+
+    // God Tiers
+    if (tier.includes('GT') || tier.includes('DIOS')) return 0xFF0000; // Rojo brillante
+
+    // High Tiers
+    if (tier.includes('HT') || tier.includes('ALTO')) return 0xFF6B35; // Naranja rojizo
+
+    // Mid Tiers
+    if (tier.includes('MT') || tier.includes('MEDIO')) return 0xFFD700; // Dorado
+
+    // Low Tiers
+    if (tier.includes('LT') || tier.includes('BAJO')) {
+        const num = parseInt(tier.match(/\d+/)?.[0] || '0'); // Extract number if exists (e.g., LT1 -> 1)
+        if (num <= 3) return 0x00FF88; // Verde brillante
+        if (num <= 6) return 0x00D9FF; // Cian
+        return 0x9D4EDD; // Púrpura
+    }
+    
+    // Fallback for general Tester roles or other custom tiers
+    if (tier.includes('TESTER')) return 0x00FFFF;
+
+    return 0x7289DA; // Por defecto
 }
+
+// Helper function to get tier emoji
+function getTierEmoji(tierRank) {
+    if (!tierRank || tierRank === 'N/A' || tierRank === 'Sin Rango' || tierRank === 'Sin Tier') return '❓';
+
+    const tier = tierRank.toUpperCase();
+    if (tier.includes('GT') || tier.includes('DIOS')) return '👑';
+    if (tier.includes('HT') || tier.includes('ALTO')) return '💎';
+    if (tier.includes('MT') || tier.includes('MEDIO')) return '⭐';
+    if (tier.includes('LT') || tier.includes('BAJO')) return '🔥';
+    if (tier.includes('TESTER')) return '🧪';
+    return '🎯';
+}
+
+// Helper function to format large numbers
+function formatNumber(num) {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+}
+
+// Helper function to create a progress bar
+function createProgressBar(value, maxValue, length = 10) {
+    const percentage = Math.min(Math.max(value / maxValue, 0), 1);
+    const filled = Math.round(percentage * length);
+    const empty = length - filled;
+
+    const fillChar = '█';
+    const emptyChar = '░';
+
+    return fillChar.repeat(filled) + emptyChar.repeat(empty);
+}
+
+// Helper to strip ANSI codes
+const stripAnsi = (str) => {
+    if (!str) return '';
+    // This regex matches common ANSI escape codes
+    return str.replace(/[][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+};
+
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -44,35 +103,27 @@ module.exports = {
             let playerName;
 
             if (useMinecraftNick) {
-                // Search by name in 'players' table
                 const [playerData] = await pool.query('SELECT uuid, name FROM players WHERE name = ?', [minecraftNick]);
                 if (playerData.length === 0) {
                     return interaction.editReply({
-                        content: `❌ No se encontró al jugador **${minecraftNick}** en la base de datos.`,
+                        content: `❌ No se encontró al jugador **${minecraftNick}** en la base de datos.`, 
                         ephemeral: true
                     });
                 }
                 uuid = playerData[0].uuid;
                 playerName = playerData[0].name;
             } else {
-                // Search by discord_id in 'discord_links'
-                // The table structure in migration was: discord_id, minecraft_uuid, minecraft_username
-                // But deploy-commands was creating: discord_id, uuid.
-                // We should support both or prefer the one from migration (minecraft_uuid)
-                // Let's try to select both uuid columns to be safe or just 'minecraft_uuid' as per migration
                 const [link] = await pool.query('SELECT minecraft_uuid, minecraft_username FROM discord_links WHERE discord_id = ?', [targetUser.id]);
                 if (link.length === 0) {
-                    // Fallback check for old table structure just in case
                     const [oldLink] = await pool.query('SELECT uuid FROM discord_links WHERE discord_id = ?', [targetUser.id]);
                     if (oldLink.length > 0) {
                          uuid = oldLink[0].uuid;
-                         // We need to fetch name from players
                          const [pData] = await pool.query('SELECT name FROM players WHERE uuid = ?', [uuid]);
                          playerName = pData.length > 0 ? pData[0].name : 'Desconocido';
                     } else {
                         const userMention = targetUser.id === interaction.user.id ? 'Tu cuenta' : `${targetUser.tag}`;
                         return interaction.editReply({
-                            content: `❌ ${userMention} no tiene su cuenta de Minecraft vinculada. Usa \`/link\` para vincularla.`,
+                            content: `❌ ${userMention} no tiene su cuenta de Minecraft vinculada. Usa \\\`/link\\\` para vincularla.`, 
                             ephemeral: true
                         });
                     }
@@ -82,13 +133,9 @@ module.exports = {
                 }
             }
 
-            // ... (previous code for getting uuid/name)
-
-            // Query stats from 'players' table
-            // We try to get 'elo' if it exists, otherwise we'll handle it
-            let stats;
+            let playerStats;
             try {
-                [stats] = await pool.query(`
+                const [statsResult] = await pool.query(`
                     SELECT 
                         wins, losses, draws, games_played, 
                         kills, deaths, 
@@ -96,11 +143,13 @@ module.exports = {
                         best_winstreak, winstreak,
                         blocks_placed, blocks_broken, 
                         victory_rank, victory_rank_level,
-                        elo
+                        elo, tier_test_rank
                     FROM players WHERE uuid = ?`, [uuid]);
+                playerStats = statsResult[0];
             } catch (err) {
-                // If 'elo' column is missing, try without it
-                [stats] = await pool.query(`
+                // Fallback query if 'elo' or 'tier_test_rank' columns do not exist
+                console.warn(`Attempting query without ELO/TierTestRank for ${uuid}: ${err.message}`);
+                const [statsResult] = await pool.query(`
                     SELECT 
                         wins, losses, draws, games_played, 
                         kills, deaths, 
@@ -109,21 +158,14 @@ module.exports = {
                         blocks_placed, blocks_broken, 
                         victory_rank, victory_rank_level
                     FROM players WHERE uuid = ?`, [uuid]);
+                playerStats = statsResult[0];
             }
 
-            if (stats.length === 0) {
+            if (!playerStats) {
                 return interaction.editReply({ content: '❌ No se encontraron estadísticas para este jugador.', ephemeral: true });
             }
 
-            const playerStats = stats[0];
-
-            // Helper to strip ANSI codes
-            const stripAnsi = (str) => {
-                if (!str) return '';
-                return str.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-            };
-
-            // Calculations
+            // Calculations, handling potential nulls/zeros
             const wins = playerStats.wins || 0;
             const losses = playerStats.losses || 0;
             const draws = playerStats.draws || 0;
@@ -131,83 +173,171 @@ module.exports = {
             const kills = playerStats.kills || 0;
             const deaths = playerStats.deaths || 0;
             
-            const kdRatio = deaths > 0 ? (kills / deaths).toFixed(2) : kills;
-            const wlRatio = losses > 0 ? (wins / losses).toFixed(2) : wins;
+            const kdRatio = deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2);
+            const wlRatio = losses > 0 ? (wins / losses).toFixed(2) : wins.toFixed(2);
             const winRate = games > 0 ? ((wins / games) * 100).toFixed(1) : 0;
+            const winRateBar = createProgressBar(parseFloat(winRate), 100, 10);
             
             const currentStreak = playerStats.winstreak || 0;
-            // If best_winstreak is 0 in DB, assume current streak if it's higher, or just 0
             const bestStreak = playerStats.best_winstreak || (currentStreak > 0 ? currentStreak : 0);
 
-            const rank = stripAnsi(playerStats.victory_rank || 'Unranked');
+            const victoryRank = stripAnsi(playerStats.victory_rank || 'Sin Rango');
             const elo = playerStats.elo || 1000;
 
-            // Determine Tier from Discord Roles
-            let tierRank = 'Sin Rango';
-            // Only check roles if we found a discord user
+            // Determine Tier from Discord Roles, overriding DB if available
+            let finalTierRank = playerStats.tier_test_rank || 'Sin Tier'; // Default to DB value or 'Sin Tier'
             let memberToCheck = null;
             
             if (discordUser) {
                 try {
                     memberToCheck = await interaction.guild.members.fetch(discordUser.id);
-                } catch (e) { /* User not in guild */ }
+                } catch (e) { /* User not in guild or fetch failed */ }
             } else if (!useMinecraftNick) {
-                // If checking self
                 memberToCheck = interaction.member;
             } else {
-                // If checking by nick, try to find if they are linked to get roles
                 try {
                     const [link] = await pool.query('SELECT discord_id FROM discord_links WHERE minecraft_uuid = ?', [uuid]);
                     if (link.length > 0) {
                         memberToCheck = await interaction.guild.members.fetch(link[0].discord_id).catch(() => null);
                     }
-                } catch (e) { }
+                } catch (e) { /* DB error or user not linked */ }
             }
 
             if (memberToCheck) {
-                // Look for roles with "Tier" or "Tester"
                 const tierRole = memberToCheck.roles.cache.find(r => 
-                    r.name.includes('Tier') || 
-                    r.name.includes('Tester') ||
-                    r.name.includes('HT') || 
-                    r.name.includes('LT')
+                    r.name.toLowerCase().includes('tier') || 
+                    r.name.toLowerCase().includes('tester') ||
+                    r.name.toLowerCase().includes('ht') || 
+                    r.name.toLowerCase().includes('lt') ||
+                    r.name.toLowerCase().includes('god tier')
                 );
                 if (tierRole) {
-                    tierRank = tierRole.name;
+                    finalTierRank = tierRole.name;
                 }
             }
+            const tierEmoji = getTierEmoji(finalTierRank);
+
 
             // Build Embed
             const embed = new EmbedBuilder()
-                .setColor(getEloColor(elo))
-                .setTitle(`Estadísticas de ${playerName}`)
-                .setThumbnail(`https://crafatar.com/avatars/${uuid}?overlay&size=128`)
+                .setColor(getTierColor(finalTierRank)) // Use tier color
+                .setAuthor({
+                    name: `${playerName}`,
+                    iconURL: `https://crafatar.com/avatars/${uuid}?overlay&size=64`
+                })
+                .setTitle(`📊 Estadísticas de The Bridge`)
+                .setThumbnail(`https://crafatar.com/avatars/${uuid}?overlay&size=128`) // Use crafatar for heads as requested
+                .setDescription('¡Aquí están las estadísticas detalladas de este jugador!')
                 .addFields(
-                    // Row 1: Main Ranks
-                    { name: '🏆 Rango', value: `**${rank}**`, inline: true },
-                    { name: '⚔️ Tier', value: `**${tierRank}**`, inline: true },
-                    { name: '🧠 ELO', value: `**${elo}**`, inline: true },
+                    // SECCIÓN DE RANGOS
+                    {
+                        name: '🏅 **RANGOS Y CLASIFICACIÓN**',
+                        value: '\u200B', // Empty field to create a line break
+                        inline: false
+                    },
+                    {
+                        name: '🏆 Rango de Victorias',
+                        value: `**${victoryRank}**`,
+                        inline: true
+                    },
+                    {
+                        name: `${tierEmoji} Tier`,
+                        value: `**${finalTierRank}**`,
+                        inline: true
+                    },
+                    {
+                        name: '🧠 ELO',
+                        value: `**${elo}**`,
+                        inline: true
+                    },
 
-                    // Row 2: Streaks & Goals
-                    { name: '🔥 Racha Actual', value: `${currentStreak}`, inline: true },
-                    { name: '⭐ Mejor Racha', value: `${bestStreak}`, inline: true },
-                    { name: '⚽ Goles', value: `${playerStats.goals || 0}`, inline: true },
+                    // SECCIÓN DE RENDIMIENTO GENERAL
+                    {
+                        name: '📊 **RENDIMIENTO GENERAL**',
+                        value: '\u200B', // Empty field for spacing
+                        inline: false
+                    },
+                    {
+                        name: '🎮 Partidas Jugadas',
+                        value: `**${formatNumber(games)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '✅ Victorias',
+                        value: `**${formatNumber(wins)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '❌ Derrotas',
+                        value: `**${formatNumber(losses)}**`,
+                        inline: true
+                    },
+                     {
+                        name: '➖ Empates',
+                        value: `**${formatNumber(draws)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '📈 Win Rate',
+                        value: `${winRateBar} **${winRate}%**`,
+                        inline: true
+                    },
+                    {
+                        name: '📊 W/L Ratio',
+                        value: `**${wlRatio}**`,
+                        inline: true
+                    },
+                    {
+                        name: '🔥 Racha Actual',
+                        value: `**${formatNumber(currentStreak)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '⭐ Mejor Racha',
+                        value: `**${formatNumber(bestStreak)}**`,
+                        inline: true
+                    },
 
-                    // Row 3: Combat
-                    { name: '⚔️ K/D Ratio', value: `${kdRatio}`, inline: true },
-                    { name: '🎯 Kills', value: `${kills}`, inline: true },
-                    { name: '💀 Muertes', value: `${deaths}`, inline: true },
-
-                    // Row 4: Game Results
-                    { name: '📊 W/L Ratio', value: `${wlRatio}`, inline: true },
-                    { name: '✅ Victorias', value: `${wins} (${winRate}%)`, inline: true },
-                    { name: '🎲 Partidas', value: `${games}`, inline: true },
-                    
-                    // Row 5: Blocks
-                    { name: '🧱 Bloques Puestos', value: `${playerStats.blocks_placed || 0}`, inline: true },
-                    { name: '⛏️ Bloques Rotos', value: `${playerStats.blocks_broken || 0}`, inline: true }
+                    // SECCIÓN DE COMBATE
+                    {
+                        name: '⚔️ **ESTADÍSTICAS DE COMBATE**',
+                        value: '\u200B', // Empty field for spacing
+                        inline: false
+                    },
+                    {
+                        name: '🎯 Kills',
+                        value: `**${formatNumber(kills)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '💀 Muertes',
+                        value: `**${formatNumber(deaths)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '📈 K/D Ratio',
+                        value: `**${kdRatio}**`,
+                        inline: true
+                    },
+                    {
+                        name: '⚽ Goles',
+                        value: `**${formatNumber(playerStats.goals || 0)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '🧱 Bloques Puestos',
+                        value: `**${formatNumber(playerStats.blocks_placed || 0)}**`,
+                        inline: true
+                    },
+                    {
+                        name: '⛏️ Bloques Rotos',
+                        value: `**${formatNumber(playerStats.blocks_broken || 0)}**`,
+                        inline: true
+                    }
                 )
-                .setFooter({ text: `UUID: ${uuid}` })
+                .setFooter({
+                    text: `UUID: ${uuid}`,
+                })
                 .setTimestamp();
 
             await interaction.editReply({ embeds: [embed] });
