@@ -76,9 +76,9 @@ module.exports = {
 
             // Record tier test result for leaderboard
             await pool.query(
-                `INSERT INTO tier_test_results (minecraft_uuid, tier_rank, tier_division, completed_at)
-                VALUES (?, ?, ?, NOW())`,
-                [uuid, tier, getTierDivision(tier)]
+                `INSERT INTO tier_test_results (minecraft_uuid, tier_rank, completed_at)
+                VALUES (?, ?, NOW())`,
+                [uuid, tier]
             );
 
             // Generate result image
