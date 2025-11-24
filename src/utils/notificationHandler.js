@@ -83,13 +83,28 @@ class NotificationHandler {
                     const member = await guild.members.fetch(discordId).catch(() => null);
                     if (member) {
                         const botMember = guild.members.me;
-                        if (botMember.permissions.has('ManageNicknames') && member.manageable && member.id !== guild.ownerId) {
-                            await member.setNickname(nickname);
-                            console.log(`[LINK] Changed nickname in guild ${guild.name}`);
+                        
+                        // Check if bot has permission AND if the user is manageable (bot role > user role)
+                        if (!botMember.permissions.has('ManageNicknames')) {
+                            console.warn(`[LINK] ⚠️ Missing 'Manage Nicknames' permission in guild: ${guild.name}`);
+                            continue;
                         }
+
+                        if (member.id === guild.ownerId) {
+                            console.warn(`[LINK] ⚠️ Cannot change nickname of server owner in ${guild.name}`);
+                            continue;
+                        }
+
+                        if (!member.manageable) {
+                            console.warn(`[LINK] ⚠️ Cannot change nickname of ${member.user.tag} in ${guild.name} (User role is higher than Bot role)`);
+                            continue;
+                        }
+
+                        await member.setNickname(nickname);
+                        console.log(`[LINK] ✅ Changed nickname for ${member.user.tag} to "${nickname}" in ${guild.name}`);
                     }
                 } catch (err) {
-                    console.error(`[LINK] Error in guild ${guild.name}:`, err);
+                    console.error(`[LINK] ❌ Error changing nickname in guild ${guild.name}:`, err);
                 }
             }
         } catch (error) {
@@ -140,7 +155,7 @@ class NotificationHandler {
                         .setColor(getRankColor(data.new_rank_name))
                         .setTitle('🎉 ¡SUBIDA DE RANGO! 🎉')
                         .setDescription(`¡**${data.player_name}** ha alcanzado el rango **${data.new_rank_name}**!`)
-                        .setThumbnail(`https://crafatar.com/avatars/${data.uuid}?overlay&size=128`)
+                        .setThumbnail(`https://visage.surgeplay.com/bust/128/${data.uuid}`)
                         .addFields(
                             { name: 'Rango Anterior', value: data.old_rank_name || 'Desconocido', inline: true },
                             { name: 'Nuevo Rango', value: data.new_rank_name, inline: true }
@@ -163,11 +178,11 @@ class NotificationHandler {
         const embed = new EmbedBuilder()
             .setColor(color)
             .setTitle(title)
-            .setThumbnail(`https://crafatar.com/avatars/${data.uuid}?overlay&size=128`)
+            .setThumbnail(`https://visage.surgeplay.com/bust/128/${data.uuid}`)
             .setTimestamp();
 
         if (data.player_name) {
-            embed.setAuthor({ name: data.player_name, iconURL: `https://crafatar.com/avatars/${data.uuid}?overlay` });
+            embed.setAuthor({ name: data.player_name, iconURL: `https://visage.surgeplay.com/face/64/${data.uuid}` });
         }
         
         if (data.message) {
