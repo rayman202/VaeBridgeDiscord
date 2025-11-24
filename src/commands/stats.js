@@ -223,10 +223,10 @@ module.exports = {
                 .setColor(getTierColor(finalTierRank)) // Use tier color
                 .setAuthor({
                     name: `${playerName}`,
-                    iconURL: `https://crafatar.com/avatars/${uuid}?overlay&size=64`
+                    iconURL: `https://visage.surgeplay.com/face/64/${uuid}`
                 })
                 .setTitle(`📊 Estadísticas de The Bridge`)
-                .setThumbnail(`https://crafatar.com/avatars/${uuid}?overlay&size=128`) // Use crafatar for heads as requested
+                .setThumbnail(`https://visage.surgeplay.com/bust/128/${uuid}`) // Use Visage bust for better quality
                 .setDescription('¡Aquí están las estadísticas detalladas de este jugador!')
                 .addFields(
                     // SECCIÓN DE RANGOS

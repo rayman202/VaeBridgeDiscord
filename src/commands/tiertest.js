@@ -1,6 +1,5 @@
-const { SlashCommandBuilder, PermissionsBitField, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField, AttachmentBuilder, EmbedBuilder } = require('discord.js');
 const pool = require('../utils/db.js');
-const { createCanvas, loadImage, registerFont } = require('canvas');
 const path = require('path');
 
 module.exports = {
