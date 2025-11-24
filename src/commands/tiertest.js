@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionsBitField, AttachmentBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionsBitField, EmbedBuilder } = require('discord.js');
 const pool = require('../utils/db.js');
 const path = require('path');
 
@@ -159,17 +159,17 @@ module.exports = {
 };
 
 function getTierColor(tier) {
-    if (tier.startsWith('HT1')) return '#ff0000'; // Red - Highest
-    if (tier.startsWith('LT1')) return '#ff4500'; // Orange Red
-    if (tier.startsWith('HT2')) return '#ff8c00'; // Dark Orange
-    if (tier.startsWith('LT2')) return '#ffa500'; // Orange
-    if (tier.startsWith('HT3')) return '#ffd700'; // Gold
-    if (tier.startsWith('LT3')) return '#ffff00'; // Yellow
-    if (tier.startsWith('HT4')) return '#7fff00'; // Chartreuse
-    if (tier.startsWith('LT4')) return '#00ff00'; // Green
-    if (tier.startsWith('HT5')) return '#00bfff'; // Deep Sky Blue
-    if (tier.startsWith('LT5')) return '#808080'; // Gray - Lowest
-    return '#ffffff'; // White - Default
+    if (tier.startsWith('HT1')) return 0xFF0000; // Red - Highest
+    if (tier.startsWith('LT1')) return 0xFF4500; // Orange Red
+    if (tier.startsWith('HT2')) return 0xFF8C00; // Dark Orange
+    if (tier.startsWith('LT2')) return 0xFFA500; // Orange
+    if (tier.startsWith('HT3')) return 0xFFD700; // Gold
+    if (tier.startsWith('LT3')) return 0xFFFF00; // Yellow
+    if (tier.startsWith('HT4')) return 0x7FFF00; // Chartreuse
+    if (tier.startsWith('LT4')) return 0x00FF00; // Green
+    if (tier.startsWith('HT5')) return 0x00BFFF; // Deep Sky Blue
+    if (tier.startsWith('LT5')) return 0x808080; // Gray - Lowest
+    return 0xFFFFFF; // White - Default
 }
 
 function getTierDivision(tier) {
